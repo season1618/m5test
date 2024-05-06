@@ -18,32 +18,8 @@ use embedded_graphics::{
     prelude::*,
     text::{Alignment, Text},
 };
-use embedded_hal::digital::{OutputPin, ErrorType, PinState};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use ili9341::{DisplaySize240x320, Ili9341, Orientation};
-// use stm32f4xx_hal::{
-//     prelude::*,
-//     spi::{Mode, NoMiso, Phase, Polarity},
-//     timer::Channel,
-// };
-
-// #[derive(Default)]
-// pub struct DummyOutputPin;
-// impl ErrorType for DummyOutputPin {
-//     type Error = ();
-// }
-
-// impl OutputPin for DummyOutputPin {
-//     fn set_low(&mut self) -> Result<(), Self::Error> {
-//         Ok(())
-//     }
-//     fn set_high(&mut self) -> Result<(), Self::Error> {
-//         Ok(())
-//     }
-//     fn set_state(&mut self, _state: PinState) -> Result<(), Self::Error> {
-//         Ok(())
-//     }
-// }
 
 #[entry]
 fn main() -> ! {
@@ -64,29 +40,26 @@ fn main() -> ! {
     let mosi = io.pins.gpio13;
     let cs = io.pins.gpio10;
 
-    let mut lcd_spi = Spi::new(
+    let lcd_spi = Spi::new(
         peripherals.SPI2,
         100.kHz(),
         SpiMode::Mode0,
-        // &mut peripheral_clock_control,
         &mut clocks,
     ).with_pins(Some(sclk), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 10>>);
 
-    let mut lcd_spi = ExclusiveDevice::new(lcd_spi, cs.into_push_pull_output(), delay).unwrap();
+    let lcd_spi = ExclusiveDevice::new(lcd_spi, cs.into_push_pull_output(), delay).unwrap();
 
     let spi_iface = SPIInterface::new(lcd_spi, lcd_dc);
-    // let dummy_reset = DummyOutputPin::default();
-    let dummy_reset = io.pins.gpio2.into_push_pull_output(); // tekitou
+    let reset = io.pins.gpio2.into_push_pull_output(); // tekitou
     
 
     let mut lcd = Ili9341::new(
         spi_iface,
-        dummy_reset,
+        reset,
         &mut delay,
         Orientation::PortraitFlipped,
         DisplaySize240x320,
-    )
-    .unwrap();
+    ).unwrap();
 
     // Create a new character style
     let style = MonoTextStyle::new(&FONT_6X10, Rgb565::RED);
