@@ -4,7 +4,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    delay::{Delay, MicrosDurationU64},
+    delay::Delay,
     gpio::{GpioPin, IO, Unknown},
     peripherals::Peripherals,
     prelude::*,
@@ -28,30 +28,19 @@ fn main() -> ! {
     let mut clocks = ClockControl::max(system.clock_control).freeze();
     let mut delay = Delay::new(&clocks);
 
-    let mut timer = esp_hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks, None).timer0;
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    // --- ili9341 ---
-    let lcd_dc = io.pins.gpio15.into_push_pull_output();
-    
-    let sck = io.pins.gpio18;
-    let mosi = io.pins.gpio23;
+    let sck = io.pins.gpio18.into_push_pull_output();
+    let mosi = io.pins.gpio23.into_push_pull_output();
     let miso = io.pins.gpio38;
-    let cs = io.pins.gpio5;
+    let cs = io.pins.gpio5.into_push_pull_output();
+    let lcd_dc = io.pins.gpio15.into_push_pull_output();
+    let reset = io.pins.gpio2.into_push_pull_output(); // tekitou
 
-    let lcd_spi = Spi::new(
-        peripherals.SPI2,
-        100.kHz(),
-        SpiMode::Mode0,
-        &mut clocks,
-    ).with_pins(Some(sck), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 5>>);
-
-    let lcd_spi = ExclusiveDevice::new(lcd_spi, cs.into_push_pull_output(), delay).unwrap();
+    let lcd_spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &mut clocks)
+        .with_pins(Some(sck), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 5>>);
+    let lcd_spi = ExclusiveDevice::new(lcd_spi, cs, delay).unwrap();
 
     let spi_iface = SPIInterface::new(lcd_spi, lcd_dc);
-    let reset = io.pins.gpio2.into_push_pull_output(); // tekitou
-    
 
     let mut lcd = Ili9341::new(
         spi_iface,
@@ -61,10 +50,8 @@ fn main() -> ! {
         DisplaySize240x320,
     ).unwrap();
 
-    // Create a new character style
     let style = MonoTextStyle::new(&FONT_6X10, Rgb565::RED);
 
-    // Create a text at position (20, 30) and draw it using the previously defined style
     Text::with_alignment(
         "First line\nSecond line",
         Point::new(20, 30),
@@ -73,10 +60,7 @@ fn main() -> ! {
     )
     .draw(&mut lcd)
     .unwrap();
-    // ---
 
     loop {
-        timer.start(MicrosDurationU64::from_ticks(1000000));
-        timer.wait();
     }
 }
