@@ -33,19 +33,19 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
     // --- ili9341 ---
-    let lcd_dc = io.pins.gpio1.into_push_pull_output(); // tekitou
+    let lcd_dc = io.pins.gpio15.into_push_pull_output();
     
-    let sclk = io.pins.gpio12;
-    let miso = io.pins.gpio11;
-    let mosi = io.pins.gpio13;
-    let cs = io.pins.gpio10;
+    let sck = io.pins.gpio18;
+    let mosi = io.pins.gpio23;
+    let miso = io.pins.gpio38;
+    let cs = io.pins.gpio5;
 
     let lcd_spi = Spi::new(
         peripherals.SPI2,
         100.kHz(),
         SpiMode::Mode0,
         &mut clocks,
-    ).with_pins(Some(sclk), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 10>>);
+    ).with_pins(Some(sck), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 5>>);
 
     let lcd_spi = ExclusiveDevice::new(lcd_spi, cs.into_push_pull_output(), delay).unwrap();
 
