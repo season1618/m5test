@@ -5,7 +5,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{GpioPin, IO, Unknown},
+    gpio::IO,
     peripherals::Peripherals,
     prelude::*,
     spi::{master::Spi, SpiMode},
@@ -34,10 +34,12 @@ fn main() -> ! {
     let miso = io.pins.gpio38;
     let cs = io.pins.gpio5.into_push_pull_output();
     let lcd_dc = io.pins.gpio15.into_push_pull_output();
-    let reset = io.pins.gpio2.into_push_pull_output(); // tekitou
+    let reset = io.pins.gpio33.into_push_pull_output(); // tekitou
 
     let lcd_spi = Spi::new(peripherals.SPI2, 100.kHz(), SpiMode::Mode0, &mut clocks)
-        .with_pins(Some(sck), Some(mosi), Some(miso), None as Option<GpioPin<Unknown, 5>>);
+        .with_sck(sck)
+        .with_mosi(mosi)
+        .with_miso(miso);
     let lcd_spi = ExclusiveDevice::new(lcd_spi, cs, delay).unwrap();
 
     let spi_iface = SPIInterface::new(lcd_spi, lcd_dc);
