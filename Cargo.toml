@@ -17,7 +17,6 @@ esp-println = { version = "0.9.1", features = ["esp32", "log"] }
 
 display-interface-spi = "0.4.1"
 embedded-hal = "0.2.7"
-embedded-hal-bus = "0.2.0"
 embedded-graphics = "0.8.0"
 mipidsi = "0.7.1"
 axp192 = "0.1.1"

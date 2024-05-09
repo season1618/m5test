@@ -5,7 +5,7 @@ use esp_backtrace as _;
 use esp32_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::{IO, NO_PIN},
+    gpio::IO,
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
@@ -15,15 +15,13 @@ use esp32_hal::{
 use display_interface_spi::SPIInterfaceNoCS;
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::{Rgb565, Rgb666},
+    pixelcolor::Rgb666,
     prelude::*,
     text::{Alignment, Text},
 };
-use embedded_hal_bus::{i2c, spi::ExclusiveDevice};
 use mipidsi::{
     Builder,
     options::{ColorInversion, ColorOrder},
-    models::ILI9342CRgb666
 };
 use axp192::Axp192;
 
@@ -40,8 +38,6 @@ fn main() -> ! {
     let miso = io.pins.gpio38;
     let cs = io.pins.gpio5;
     let lcd_dc = io.pins.gpio15.into_push_pull_output();
-    let mut reset = io.pins.gpio33.into_push_pull_output(); // tekitou
-    reset.set_high();
 
     let i2c = I2C::new(
         peripherals.I2C0,
@@ -65,44 +61,28 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
         &mut clocks
     );
-    // let lcd_spi = ExclusiveDevice::new_no_delay(lcd_spi, cs).unwrap();
 
     let spi_iface = SPIInterfaceNoCS::new(lcd_spi, lcd_dc);
 
-    // let mut lcd = Builder::new(ILI9342CRgb666, spi_iface)
-    //     .reset_pin(reset)
-    //     .init(&mut delay)
-    //     .unwrap();
-
     let mut lcd = Builder::ili9342c_rgb666(spi_iface)
+        .with_display_size(320, 240)
         .with_color_order(ColorOrder::Bgr)
         .with_invert_colors(ColorInversion::Inverted)
-        .init(
-            &mut delay,
-            Some(reset),
-        )
+        .init(&mut delay, Some(io.pins.gpio33.into_push_pull_output())) // tekitou
         .unwrap();
 
-    // let mut lcd = Ili9341::new(
-    //     spi_iface,
-    //     reset,
-    //     &mut delay,
-    //     Orientation::PortraitFlipped,
-    //     DisplaySize240x320,
-    // ).unwrap();
+    // lcd.clear(Rgb666::RED).unwrap();
 
-    lcd.clear(Rgb666::RED).unwrap();
+    let style = MonoTextStyle::new(&FONT_6X10, Rgb666::BLACK);
 
-    // let style = MonoTextStyle::new(&FONT_6X10, Rgb666::RED);
-
-    // Text::with_alignment(
-    //     "First line\nSecond line",
-    //     Point::new(20, 30),
-    //     style,
-    //     Alignment::Center,
-    // )
-    // .draw(&mut lcd)
-    // .unwrap();
+    Text::with_alignment(
+        "Hello, world!",
+        Point::new(20, 30),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut lcd)
+    .unwrap();
 
     loop {
     }
