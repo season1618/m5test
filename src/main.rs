@@ -5,7 +5,7 @@ use esp_backtrace as _;
 use esp32_hal::{
     clock::ClockControl,
     delay::Delay,
-    gpio::IO,
+    gpio::{IO, GpioPin, Output, PushPull},
     i2c::I2C,
     peripherals::Peripherals,
     prelude::*,
@@ -68,7 +68,7 @@ fn main() -> ! {
         .with_display_size(320, 240)
         .with_color_order(ColorOrder::Bgr)
         .with_invert_colors(ColorInversion::Inverted)
-        .init(&mut delay, Some(io.pins.gpio33.into_push_pull_output())) // tekitou
+        .init(&mut delay, None::<GpioPin<Output<PushPull>, 0>>) // tekitou
         .unwrap();
 
     // lcd.clear(Rgb666::RED).unwrap();
