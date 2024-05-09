@@ -19,7 +19,6 @@ use embedded_graphics::{
     text::{Alignment, Text},
 };
 use embedded_hal_bus::spi::ExclusiveDevice;
-use ili9341::{DisplaySize240x320, Ili9341, Orientation};
 use mipidsi::{Builder, models::ILI9342CRgb666};
 
 #[entry]
