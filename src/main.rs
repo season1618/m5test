@@ -37,7 +37,7 @@ fn main() -> ! {
     let mosi = io.pins.gpio23;
     let miso = io.pins.gpio38;
     let cs = io.pins.gpio5;
-    let lcd_dc = io.pins.gpio15.into_push_pull_output();
+    let dc = io.pins.gpio15.into_push_pull_output();
 
     let i2c = I2C::new(
         peripherals.I2C0,
@@ -50,7 +50,7 @@ fn main() -> ! {
     let mut axp = Axp192::new(i2c);
     m5sc2_init(&mut axp, &mut delay).unwrap();
 
-    let lcd_spi = Spi::new(
+    let spi = Spi::new(
         peripherals.SPI2,
         sck,
         mosi,
@@ -61,9 +61,7 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
         &mut clocks
     );
-
-    let spi_iface = SPIInterfaceNoCS::new(lcd_spi, lcd_dc);
-
+    let spi_iface = SPIInterfaceNoCS::new(spi, dc);
     let mut lcd = Builder::ili9342c_rgb666(spi_iface)
         .with_display_size(320, 240)
         .with_color_order(ColorOrder::Bgr)
