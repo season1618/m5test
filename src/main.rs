@@ -6,11 +6,10 @@ use esp32_hal::{
     clock::ClockControl,
     delay::Delay,
     gpio::{IO, GpioPin, Output, PushPull},
-    i2c::I2C,
-    peripherals::Peripherals,
+    i2c::{self, I2C},
+    peripherals::{self, Peripherals},
     prelude::*,
     spi::{Spi, SpiMode},
-    timer::TimerGroup,
 };
 use esp_println::println;
 
@@ -26,6 +25,13 @@ use mipidsi::{
     options::{ColorInversion, ColorOrder},
 };
 use axp192::Axp192;
+
+const CONFIG: u8 = 0x01;
+const PWR_MGMT_1: u8 = 0x6B;
+const ACCEL: u8 = 0x3B;
+const TEMP: u8 = 0x41;
+const GYRO: u8 = 0x43;
+const SLAVE_ADDR: u8 = 0x68;
 
 #[entry]
 fn main() -> ! {
@@ -50,29 +56,56 @@ fn main() -> ! {
         &clocks,
     );
 
-    const CONFIG: u8 = 0x01;
-    const PWR_MGMT_1: u8 = 0x6B;
-    const ACCEL: u8 = 0x3B;
-    const TEMP: u8 = 0x41;
-    const GYRO: u8 = 0x43;
-    const SLAVE_ADDR: u8 = 0x68;
+    let i2c_ptr = &mut i2c as *mut I2C<_>;
+    let mpu = unsafe { &mut *i2c_ptr as &mut I2C<_> };
+    mpu6886_init(mpu, &mut delay).unwrap();
 
-    i2c.write(SLAVE_ADDR, &[PWR_MGMT_1, 0b1_0_0_0_0_000]).unwrap(); // reset
-    delay.delay_ms(1000u32);
-    i2c.write(SLAVE_ADDR, &[PWR_MGMT_1, 0b0_0_0_0_0_001]).unwrap(); // enable gyroscope
-    i2c.write(SLAVE_ADDR, &[CONFIG, 0b0_0_0_00_0_01]).unwrap();
+    let mut axp = Axp192::new(i2c);
+    axp192_init(&mut axp, &mut delay).unwrap();
+
+    let spi = Spi::new(
+        peripherals.SPI2,
+        sck,
+        mosi,
+        miso,
+        cs,
+        400u32.kHz(),
+        SpiMode::Mode0,
+        &mut system.peripheral_clock_control,
+        &mut clocks
+    );
+    let spi_iface = SPIInterfaceNoCS::new(spi, dc);
+    let mut lcd = Builder::ili9342c_rgb666(spi_iface)
+        .with_display_size(320, 240)
+        .with_color_order(ColorOrder::Bgr)
+        .with_invert_colors(ColorInversion::Inverted)
+        .init(&mut delay, None::<GpioPin<Output<PushPull>, 0>>) // tekitou
+        .unwrap();
+
+    // lcd.clear(Rgb666::RED).unwrap();
+
+    let style = MonoTextStyle::new(&FONT_6X10, Rgb666::BLACK);
+
+    Text::with_alignment(
+        "Hello, world!",
+        Point::new(20, 30),
+        style,
+        Alignment::Center,
+    )
+    .draw(&mut lcd)
+    .unwrap();
 
     loop {
         let mut accel_buf = [0; 6];
         let mut gyro_buf = [0; 6];
         let mut temp_buf = [0; 2];
 
-        i2c.write(SLAVE_ADDR, &[ACCEL]).unwrap();
-        i2c.read(SLAVE_ADDR, &mut accel_buf).unwrap();
-        i2c.write(SLAVE_ADDR, &[GYRO]).unwrap();
-        i2c.read(SLAVE_ADDR, &mut gyro_buf).unwrap();
-        i2c.write(SLAVE_ADDR, &[TEMP]).unwrap();
-        i2c.read(SLAVE_ADDR, &mut temp_buf).unwrap();
+        mpu.write(SLAVE_ADDR, &[ACCEL]).unwrap();
+        mpu.read(SLAVE_ADDR, &mut accel_buf).unwrap();
+        mpu.write(SLAVE_ADDR, &[GYRO]).unwrap();
+        mpu.read(SLAVE_ADDR, &mut gyro_buf).unwrap();
+        mpu.write(SLAVE_ADDR, &[TEMP]).unwrap();
+        mpu.read(SLAVE_ADDR, &mut temp_buf).unwrap();
 
         let accel = (concat(&accel_buf[0..2]) / 16384.0, concat(&accel_buf[2..4]) / 16384.0, concat(&accel_buf[4..6]) / 16384.0);
         let gyro = (concat(&gyro_buf[0..2]) / 131.0, concat(&gyro_buf[2..4]) / 131.0, concat(&gyro_buf[4..6]) / 131.0);
@@ -91,7 +124,16 @@ fn concat(arr: &[u8]) -> f32 {
     (((arr[0] as u16) << 8 | arr[1] as u16) as i16) as f32
 }
 
-fn m5sc2_init<I2C, E>(axp: &mut axp192::Axp192<I2C>, delay: &mut Delay) -> Result<(), E>
+fn mpu6886_init<'a>(mpu: &mut I2C<'a, peripherals::I2C0>, delay: &mut Delay) -> Result<(), i2c::Error> {
+    mpu.write(SLAVE_ADDR, &[PWR_MGMT_1, 0b1_0_0_0_0_000])?; // reset
+    delay.delay_ms(1000u32);
+    mpu.write(SLAVE_ADDR, &[PWR_MGMT_1, 0b0_0_0_0_0_001])?; // enable gyroscope
+    mpu.write(SLAVE_ADDR, &[CONFIG, 0b0_0_0_00_0_01])?;
+
+    Ok(())
+}
+
+fn axp192_init<I2C, E>(axp: &mut Axp192<I2C>, delay: &mut Delay) -> Result<(), E>
 where
     I2C: embedded_hal::blocking::i2c::Read<Error = E>
         + embedded_hal::blocking::i2c::Write<Error = E>
