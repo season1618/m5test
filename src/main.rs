@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+use core::fmt::Write;
+use core::format_args;
+
 use esp_backtrace as _;
 use esp32_hal::{
     clock::ClockControl,
@@ -10,6 +13,7 @@ use esp32_hal::{
     peripherals::{self, Peripherals},
     prelude::*,
     spi::{Spi, SpiMode},
+    uart::{config, TxRxPins, Uart}
 };
 use esp_println::println;
 
@@ -46,6 +50,28 @@ fn main() -> ! {
     let miso = io.pins.gpio38;
     let cs = io.pins.gpio5;
     let dc = io.pins.gpio15.into_push_pull_output();
+
+    let config = config::Config {
+        baudrate: 115200,
+        data_bits: config::DataBits::DataBits8,
+        parity: config::Parity::ParityNone,
+        stop_bits: config::StopBits::STOP1,
+    };
+    
+    let txrxpins = TxRxPins::new_tx_rx(
+        io.pins.gpio1.into_push_pull_output(),
+        io.pins.gpio3.into_floating_input(),
+    );
+    
+    let mut uart = Uart::new_with_config(
+        peripherals.UART0,
+        Some(config),
+        Some(txrxpins),
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+
+    uart.write_str("hello, world\n").unwrap();
 
     let mut i2c = I2C::new(
         peripherals.I2C0,
@@ -96,6 +122,10 @@ fn main() -> ! {
     .unwrap();
 
     loop {
+        if let Ok(ch) = uart.read() {
+            uart.write_bytes(&mut [ch]).unwrap();
+        }
+
         let mut accel_buf = [0; 6];
         let mut gyro_buf = [0; 6];
         let mut temp_buf = [0; 2];
