@@ -122,9 +122,13 @@ fn main() -> ! {
     .unwrap();
 
     loop {
-        if let Ok(ch) = uart.read() {
-            uart.write_bytes(&mut [ch]).unwrap();
-        }
+        let mut buf: &mut [u8] = &mut [0; 100];
+        buf = read_line(&mut uart, buf);
+        uart.write_str("\n").unwrap();
+        uart.write_bytes(buf).unwrap();
+        // if let Ok(ch) = uart.read() {
+        //     uart.write_bytes(&mut [ch]).unwrap();
+        // }
 
         let mut accel_buf = [0; 6];
         let mut gyro_buf = [0; 6];
@@ -148,6 +152,22 @@ fn main() -> ! {
 
         delay.delay_ms(1000u32);
     }
+}
+
+fn read_line<'a, T>(uart: &mut Uart<T>, buf: &'a mut [u8]) -> &'a mut [u8] 
+    where T: esp32_hal::uart::Instance {
+    let mut idx = 0;
+    while idx < buf.len() {
+        if let Ok(c) = uart.read() {
+            buf[idx] = c;
+            uart.write(c).unwrap();
+            idx += 1;
+            if c == b'\n' {
+                return &mut buf[..idx];
+            }
+        }
+    }
+    buf
 }
 
 fn concat(arr: &[u8]) -> f32 {
