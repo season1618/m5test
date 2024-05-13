@@ -1,7 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
+use core::{
+    fmt::Write,
+    str::from_utf8,
+};
 use core::format_args;
 
 use esp_backtrace as _;
@@ -124,11 +127,8 @@ fn main() -> ! {
     loop {
         let mut buf: &mut [u8] = &mut [0; 100];
         buf = read_line(&mut uart, buf);
-        uart.write_str("\n").unwrap();
-        uart.write_bytes(buf).unwrap();
-        // if let Ok(ch) = uart.read() {
-        //     uart.write_bytes(&mut [ch]).unwrap();
-        // }
+        let msg = from_utf8(buf).unwrap();
+        println!("{}", msg);
 
         let mut accel_buf = [0; 6];
         let mut gyro_buf = [0; 6];
@@ -158,13 +158,17 @@ fn read_line<'a, T>(uart: &mut Uart<T>, buf: &'a mut [u8]) -> &'a mut [u8]
     where T: esp32_hal::uart::Instance {
     let mut idx = 0;
     while idx < buf.len() {
-        if let Ok(c) = uart.read() {
-            buf[idx] = c;
-            uart.write(c).unwrap();
-            idx += 1;
-            if c == b'\n' {
+        match uart.read() {
+            Ok(b'\r') => {
+                uart.write(b'\n').unwrap();
                 return &mut buf[..idx];
-            }
+            },
+            Ok(c) => {
+                uart.write(c).unwrap();
+                buf[idx] = c;
+                idx += 1;
+            },
+            Err(_) => {},
         }
     }
     buf
